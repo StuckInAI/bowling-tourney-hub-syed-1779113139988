@@ -1,23 +1,25 @@
 import type { AppState } from '@/types';
 
-const STORAGE_KEY = 'bowlbook_state';
+const STORAGE_KEY = 'bowling-reservation-state';
 
 export function loadState(): AppState | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      return JSON.parse(raw) as AppState;
-    }
-  } catch (e) {
-    console.error('Failed to load state from localStorage', e);
+    if (!raw) return null;
+    return JSON.parse(raw) as AppState;
+  } catch {
+    return null;
   }
-  return null;
 }
 
 export function saveState(state: AppState): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (e) {
-    console.error('Failed to save state to localStorage', e);
+  } catch {
+    // ignore quota errors
   }
+}
+
+export function clearState(): void {
+  localStorage.removeItem(STORAGE_KEY);
 }

@@ -1,51 +1,58 @@
+import { useState } from 'react';
 import { useApp } from '@/hooks/useAppContext';
 import Card from '@/components/ui/Card';
-import Badge from '@/components/ui/Badge';
-import { Clock, MapPin } from 'lucide-react';
+import { formatHour, getToday } from '@/lib/utils';
+import type { Lane, TimeSlot } from '@/types';
 
 export default function PublicSlotsPage() {
   const { state } = useApp();
+  const [date, setDate] = useState(getToday());
 
-  const today = new Date().toISOString().split('T')[0];
-  const availableSlots = state.slots.filter(
-    (s) => s.date >= today && s.status === 'available'
-  );
+  const availableLanes = state.lanes.filter((l: Lane) => l.status === 'available');
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', padding: 24 }}>
-      <div style={{ textAlign: 'center', marginBottom: 32 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>🎳 Available Bowling Slots</h1>
-        <p style={{ color: 'var(--color-text-light)' }}>View available time slots for booking</p>
-      </div>
-
-      {availableSlots.length === 0 ? (
-        <Card>
-          <p style={{ textAlign: 'center', color: 'var(--color-text-light)', padding: 32 }}>No available slots at this time. Please check back later.</p>
-        </Card>
-      ) : (
-        <div style={{ display: 'grid', gap: 12 }}>
-          {availableSlots.map((slot) => {
-            const lane = state.lanes.find((l) => l.id === slot.laneId);
-            return (
-              <Card key={slot.id}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <MapPin size={16} />
-                      <span style={{ fontWeight: 600 }}>{lane ? lane.name : 'Unknown Lane'}</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-text-light)', fontSize: 14 }}>
-                      <Clock size={14} />
-                      <span>{new Date(slot.date).toLocaleDateString()} — {slot.startTime} to {slot.endTime}</span>
-                    </div>
-                  </div>
-                  <Badge label="Available" variant="success" />
+      <h1 style={{ marginBottom: 8 }}>🎳 BowlBook – Available Slots</h1>
+      <p style={{ color: 'var(--color-text-light)', marginBottom: 16 }}>Check lane availability for your visit</p>
+      <input
+        type="date"
+        value={date}
+        onChange={(e) => setDate(e.target.value)}
+        style={{ marginBottom: 16, padding: 8, borderRadius: 8, border: '1px solid var(--color-border)' }}
+      />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {availableLanes.map((lane: Lane) => {
+          const slots = state.timeSlots.filter(
+            (s: TimeSlot) => s.laneId === lane.id && s.date === date && s.status === 'available'
+          );
+          return (
+            <Card key={lane.id}>
+              <h3>{lane.name}</h3>
+              {slots.length === 0 ? (
+                <p style={{ color: 'var(--color-text-light)' }}>No available slots</p>
+              ) : (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                  {slots.map((s: TimeSlot) => (
+                    <span
+                      key={s.id}
+                      style={{
+                        padding: '4px 12px',
+                        background: '#dcfce7',
+                        color: '#15803d',
+                        borderRadius: 8,
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {formatHour(s.startHour)} - {formatHour(s.endHour)}
+                    </span>
+                  ))}
                 </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+              )}
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }

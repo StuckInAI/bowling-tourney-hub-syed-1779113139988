@@ -5,50 +5,50 @@ export type User = {
   name: string;
   email: string;
   role: UserRole;
-  avatar?: string;
+  phone?: string;
+  createdAt: string;
 };
 
-export type Member = {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  membershipType: 'basic' | 'premium' | 'vip';
-  status: 'active' | 'inactive' | 'suspended';
-  joinDate: string;
-  gamesPlayed: number;
-  averageScore: number;
-};
+export type LaneStatus = 'available' | 'occupied' | 'maintenance';
 
 export type Lane = {
   id: string;
   name: string;
   number: number;
-  status: 'available' | 'occupied' | 'maintenance';
-  type: 'standard' | 'vip' | 'cosmic';
+  status: LaneStatus;
 };
 
 export type TimeSlot = {
   id: string;
   laneId: string;
   date: string;
-  startTime: string;
-  endTime: string;
+  startHour: number;
+  endHour: number;
   status: 'available' | 'booked' | 'blocked';
-  price: number;
+  bookingId?: string;
 };
 
 export type Booking = {
   id: string;
-  memberId: string;
-  slotId: string;
+  userId: string;
   laneId: string;
   date: string;
-  startTime: string;
-  endTime: string;
-  status: 'confirmed' | 'pending' | 'cancelled' | 'completed';
-  totalAmount: number;
+  startHour: number;
+  endHour: number;
+  status: 'confirmed' | 'pending' | 'cancelled';
+  players: number;
   createdAt: string;
+};
+
+export type SubscriptionStatus = 'active' | 'expired' | 'cancelled';
+
+export type Subscription = {
+  id: string;
+  userId: string;
+  plan: string;
+  status: SubscriptionStatus;
+  startDate: string;
+  endDate: string;
 };
 
 export type Tournament = {
@@ -56,44 +56,43 @@ export type Tournament = {
   name: string;
   date: string;
   maxParticipants: number;
-  entryFee: number;
-  status: 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
   participants: string[];
-  createdAt: string;
+  status: 'upcoming' | 'active' | 'completed';
+  description?: string;
 };
 
 export type Notification = {
   id: string;
   userId: string;
-  title: string;
   message: string;
   read: boolean;
   createdAt: string;
+  type: 'info' | 'warning' | 'success';
 };
 
 export type AppState = {
   currentUser: User | null;
-  members: Member[];
+  users: User[];
   lanes: Lane[];
-  slots: TimeSlot[];
+  timeSlots: TimeSlot[];
   bookings: Booking[];
+  subscriptions: Subscription[];
   tournaments: Tournament[];
   notifications: Notification[];
 };
 
-export type AppActions = {
-  login: (email: string) => boolean;
+export type AppContextType = {
+  state: AppState;
+  login: (email: string, password?: string) => User | null;
   logout: () => void;
-  addMember: (member: Member) => void;
-  updateMember: (id: string, updates: Partial<Member>) => void;
-  deleteMember: (id: string) => void;
-  updateLaneStatus: (id: string, status: Lane['status']) => void;
+  addUser: (user: User) => void;
+  updateLane: (lane: Lane) => void;
   addBooking: (booking: Booking) => void;
-  updateBookingStatus: (id: string, status: Booking['status']) => void;
-  addTournament: (tournament: Tournament) => void;
-  joinTournament: (tournamentId: string) => void;
+  cancelBooking: (id: string) => void;
+  addSubscription: (sub: Subscription) => void;
+  updateSubscription: (id: string, updates: Partial<Subscription>) => void;
+  joinTournament: (tournamentId: string, userId: string) => void;
+  leaveTournament: (tournamentId: string, userId: string) => void;
   markNotificationRead: (id: string) => void;
-  markAllNotificationsRead: () => void;
+  addNotification: (notification: Notification) => void;
 };
-
-export type AppContextType = AppState & AppActions & { state: AppState };

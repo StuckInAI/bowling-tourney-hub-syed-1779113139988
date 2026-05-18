@@ -1,4 +1,4 @@
-import type { ReactNode, MouseEvent } from 'react';
+import type { ReactNode, MouseEvent, CSSProperties } from 'react';
 import clsx from 'clsx';
 import styles from './Button.module.css';
 
@@ -10,15 +10,17 @@ type ButtonProps = {
   fullWidth?: boolean;
   type?: 'button' | 'submit' | 'reset';
   onClick?: (e: MouseEvent<HTMLButtonElement>) => void;
+  style?: CSSProperties;
 };
 
-export default function Button({ children, variant = 'primary', size = 'md', disabled = false, fullWidth = false, type = 'button', onClick }: ButtonProps) {
+export default function Button({ children, variant = 'primary', size = 'md', disabled = false, fullWidth = false, type = 'button', onClick, style }: ButtonProps) {
   return (
     <button
       type={type}
       className={clsx(styles.btn, styles[variant], styles[size], fullWidth && styles.fullWidth)}
       disabled={disabled}
       onClick={onClick}
+      style={style}
     >
       {children}
     </button>

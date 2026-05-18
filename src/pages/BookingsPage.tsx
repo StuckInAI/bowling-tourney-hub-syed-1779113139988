@@ -1,210 +1,170 @@
 import { useState } from 'react';
 import { useApp } from '@/hooks/useAppContext';
 import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import ToastContainer, { showToast } from '@/components/ui/Toast';
-import { generateId, formatDate, formatHour, getToday, getTomorrow, isSubscriptionActive } from '@/lib/utils';
+import { generateId, formatHour } from '@/lib/utils';
+import type { Booking, User, Lane } from '@/types';
 import styles from './BookingsPage.module.css';
 
 export default function BookingsPage() {
-  const { state, addBooking, cancelBooking, addNotification } = useApp();
+  const { state, addBooking, cancelBooking } = useApp();
+  const [showModal, setShowModal] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<'all' | 'confirmed' | 'pending' | 'cancelled'>('all');
+  const [newLane, setNewLane] = useState('');
+  const [newDate, setNewDate] = useState('');
+  const [newStart, setNewStart] = useState(10);
+  const [newEnd, setNewEnd] = useState(11);
+  const [newPlayers, setNewPlayers] = useState(2);
+
   const user = state.currentUser;
-  const [showBookModal, setShowBookModal] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(getToday());
-  const [selectedLane, setSelectedLane] = useState('');
-  const [selectedHour, setSelectedHour] = useState<number>(9);
 
-  if (!user) return null;
+  const bookings = state.bookings
+    .filter((b: Booking) => {
+      if (user?.role === 'member') return b.userId === user.id;
+      return true;
+    })
+    .filter((b: Booking) => filterStatus === 'all' || b.status === filterStatus)
+    .sort((a: Booking, b: Booking) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  const isMember = user.role === 'member';
-  const isAdminOrStaff = user.role === 'super_admin' || user.role === 'venue_manager' || user.role === 'staff';
-
-  const myBookings = isMember
-    ? state.bookings.filter((b) => b.userId === user.id)
-    : state.bookings;
-
-  const sortedBookings = [...myBookings].sort((a, b) => {
-    const dateA = new Date(a.date + 'T' + String(a.startHour).padStart(2, '0') + ':00:00');
-    const dateB = new Date(b.date + 'T' + String(b.startHour).padStart(2, '0') + ':00:00');
-    return dateB.getTime() - dateA.getTime();
-  });
-
-  const activeLanes = state.lanes.filter((l) => l.status === 'active');
-
-  const availableHours = (): number[] => {
-    if (!selectedLane) return [];
-    const hours: number[] = [];
-    for (let h = 9; h < 22; h++) {
-      const slot = state.timeSlots.find(
-        (s) => s.laneId === selectedLane && s.date === selectedDate && s.startHour === h
-      );
-      if (slot && slot.status === 'available') {
-        hours.push(h);
-      }
-    }
-    return hours;
-  };
-
-  const handleBook = () => {
-    if (!selectedLane || selectedHour === undefined) {
-      showToast('Select a lane and time.', 'error');
-      return;
-    }
-
-    if (isMember) {
-      const sub = state.subscriptions.find((s) => s.userId === user.id);
-      if (!isSubscriptionActive(sub)) {
-        showToast('Your subscription is not active.', 'error');
-        return;
-      }
-    }
-
-    const slot = state.timeSlots.find(
-      (s) => s.laneId === selectedLane && s.date === selectedDate && s.startHour === selectedHour
-    );
-    if (!slot || slot.status !== 'available') {
-      showToast('This slot is no longer available.', 'error');
-      return;
-    }
-
-    const bookingId = generateId();
-    addBooking({
-      id: bookingId,
-      slotId: slot.id,
-      laneId: selectedLane,
-      date: selectedDate,
-      startHour: selectedHour,
-      endHour: selectedHour + 1,
-      type: 'member',
-      status: 'confirmed',
-      userId: user.id,
-      outsiderName: null,
-      outsiderEmail: null,
-      outsiderPhone: null,
-      paymentMethod: null,
-      createdAt: new Date().toISOString(),
-    });
-
-    addNotification({
+  const handleCreate = () => {
+    if (!user || !newLane || !newDate) return;
+    const booking: Booking = {
       id: generateId(),
       userId: user.id,
-      type: 'booking_confirmation',
-      title: 'Booking Confirmed',
-      message: `Lane ${state.lanes.find((l) => l.id === selectedLane)?.number} booked for ${formatDate(selectedDate)} at ${formatHour(selectedHour)}.`,
-      read: false,
-      link: '/bookings',
+      laneId: newLane,
+      date: newDate,
+      startHour: newStart,
+      endHour: newEnd,
+      status: 'confirmed',
+      players: newPlayers,
       createdAt: new Date().toISOString(),
-    });
-
-    showToast('Booking confirmed!', 'success');
-    setShowBookModal(false);
-  };
-
-  const handleCancel = (bookingId: string) => {
-    cancelBooking(bookingId);
-    showToast('Booking cancelled.', 'info');
+    };
+    addBooking(booking);
+    setShowModal(false);
+    setNewLane('');
+    setNewDate('');
+    setNewStart(10);
+    setNewEnd(11);
+    setNewPlayers(2);
   };
 
   return (
-    <div className={styles.page}>
-      <ToastContainer />
-      <div className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>{isMember ? 'My Bookings' : 'All Bookings'}</h1>
-        {isMember && <Button onClick={() => setShowBookModal(true)}>Book a Lane</Button>}
+    <div>
+      <div className={styles.header}>
+        <h1>Bookings</h1>
+        <Button onClick={() => setShowModal(true)}>+ New Booking</Button>
+      </div>
+
+      <div className={styles.filters}>
+        <select
+          className={styles.select}
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
+        >
+          <option value="all">All Status</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="pending">Pending</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
       </div>
 
       <Card>
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Time</th>
-                <th>Lane</th>
-                <th>Type</th>
-                {isAdminOrStaff && <th>Booked By</th>}
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedBookings.map((b) => (
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>Member</th>
+              <th>Lane</th>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Players</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {bookings.map((b: Booking) => {
+              const member = state.users.find((u: User) => u.id === b.userId);
+              const lane = state.lanes.find((l: Lane) => l.id === b.laneId);
+              return (
                 <tr key={b.id}>
-                  <td>{formatDate(b.date)}</td>
+                  <td>{member?.name || 'Unknown'}</td>
+                  <td>{lane?.name || 'Unknown'}</td>
+                  <td>{b.date}</td>
                   <td>{formatHour(b.startHour)} - {formatHour(b.endHour)}</td>
-                  <td>Lane {state.lanes.find((l) => l.id === b.laneId)?.number}</td>
-                  <td><Badge label={b.type} variant={b.type === 'member' ? 'info' : 'purple'} /></td>
-                  {isAdminOrStaff && (
-                    <td>
-                      {b.type === 'member'
-                        ? state.users.find((u) => u.id === b.userId)?.name || '—'
-                        : b.outsiderName || '—'}
-                    </td>
-                  )}
+                  <td>{b.players}</td>
                   <td>
                     <Badge
-                      label={b.status.replace('_', ' ')}
-                      variant={b.status === 'confirmed' ? 'success' : b.status === 'cancelled' ? 'danger' : 'warning'}
+                      label={b.status}
+                      variant={b.status === 'confirmed' ? 'success' : b.status === 'pending' ? 'warning' : 'danger'}
                     />
                   </td>
                   <td>
-                    {b.status === 'confirmed' && (
-                      <Button size="sm" variant="danger" onClick={() => handleCancel(b.id)}>Cancel</Button>
+                    {b.status !== 'cancelled' && (
+                      <Button size="sm" variant="danger" onClick={() => cancelBooking(b.id)}>
+                        Cancel
+                      </Button>
                     )}
                   </td>
                 </tr>
-              ))}
-              {sortedBookings.length === 0 && (
-                <tr><td colSpan={isAdminOrStaff ? 7 : 6} className={styles.emptyRow}>No bookings found.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              );
+            })}
+          </tbody>
+        </table>
       </Card>
 
-      <Modal isOpen={showBookModal} onClose={() => setShowBookModal(false)} title="Book a Lane">
-        <div className={styles.formFields}>
-          <div className={styles.field}>
-            <label className={styles.label}>Date</label>
-            <select
-              className={styles.select}
-              value={selectedDate}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedDate(e.target.value)}
-            >
-              <option value={getToday()}>Today ({getToday()})</option>
-              <option value={getTomorrow()}>Tomorrow ({getTomorrow()})</option>
-            </select>
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Lane</label>
-            <select
-              className={styles.select}
-              value={selectedLane}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedLane(e.target.value)}
-            >
-              <option value="">Select a lane</option>
-              {activeLanes.map((l) => (
-                <option key={l.id} value={l.id}>Lane {l.number}</option>
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="New Booking">
+        <div className={styles.formGroup}>
+          <label>Lane</label>
+          <select value={newLane} onChange={(e) => setNewLane(e.target.value)}>
+            <option value="">Select lane</option>
+            {state.lanes
+              .filter((l: Lane) => l.status === 'available')
+              .map((l: Lane) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
               ))}
-            </select>
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Time Slot</label>
-            <select
-              className={styles.select}
-              value={selectedHour}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedHour(parseInt(e.target.value, 10))}
-            >
-              {availableHours().length === 0 && <option>No available slots</option>}
-              {availableHours().map((h) => (
-                <option key={h} value={h}>{formatHour(h)} - {formatHour(h + 1)}</option>
-              ))}
-            </select>
-          </div>
-          <Button onClick={handleBook} fullWidth>Confirm Booking</Button>
+          </select>
         </div>
+        <div className={styles.formGroup}>
+          <label>Date</label>
+          <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} />
+        </div>
+        <div className={styles.formGroup}>
+          <label>Start Hour</label>
+          <select value={newStart} onChange={(e) => setNewStart(Number(e.target.value))}>
+            {Array.from({ length: 14 }, (_, i) => i + 8).map((h) => (
+              <option key={h} value={h}>
+                {formatHour(h)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className={styles.formGroup}>
+          <label>End Hour</label>
+          <select value={newEnd} onChange={(e) => setNewEnd(Number(e.target.value))}>
+            {Array.from({ length: 14 }, (_, i) => i + 8).map((h) => (
+              <option key={h} value={h}>
+                {formatHour(h)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className={styles.formGroup}>
+          <label>Players</label>
+          <input
+            type="number"
+            min={1}
+            max={8}
+            value={newPlayers}
+            onChange={(e) => setNewPlayers(Number(e.target.value))}
+          />
+        </div>
+        <Button onClick={handleCreate} fullWidth>
+          Create Booking
+        </Button>
       </Modal>
     </div>
   );

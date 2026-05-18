@@ -1,140 +1,112 @@
 import { useState, useCallback } from 'react';
+import type { AppState, AppContextType, User, Lane, Booking, Subscription, Notification } from '@/types';
 import { loadState, saveState } from '@/lib/storage';
 import { seedData } from '@/lib/seedData';
-import type { AppState, Member, Lane, Booking, Tournament, Notification, AppContextType } from '@/types';
 
-const initialState: AppState = loadState() || seedData();
+function getInitialState(): AppState {
+  const saved = loadState();
+  if (saved) return saved;
+  return seedData();
+}
 
 export function useAppState(): AppContextType {
-  const [state, setState] = useState<AppState>(initialState);
+  const [state, setState] = useState<AppState>(getInitialState);
 
-  const persist = useCallback((newState: AppState) => {
+  const persist = (newState: AppState) => {
     setState(newState);
     saveState(newState);
-  }, []);
+  };
 
-  const login = useCallback((email: string): boolean => {
-    const users = [
-      { id: 'u1', name: 'Admin User', email: 'admin@bowlbook.com', role: 'super_admin' as const },
-      { id: 'u2', name: 'Manager Smith', email: 'manager@bowlbook.com', role: 'venue_manager' as const },
-      { id: 'u3', name: 'Staff Jones', email: 'staff@bowlbook.com', role: 'staff' as const },
-      { id: 'u4', name: 'John Member', email: 'member@bowlbook.com', role: 'member' as const },
-    ];
-    const user = users.find((u) => u.email === email);
+  const login = useCallback((email: string, _password?: string): User | null => {
+    const user = state.users.find((u) => u.email === email);
     if (user) {
       const newState = { ...state, currentUser: user };
       persist(newState);
-      return true;
+      return user;
     }
-    return false;
-  }, [state, persist]);
+    return null;
+  }, [state]);
 
   const logout = useCallback(() => {
-    const newState = { ...state, currentUser: null };
-    persist(newState);
-  }, [state, persist]);
+    persist({ ...state, currentUser: null });
+  }, [state]);
 
-  const addMember = useCallback((member: Member) => {
-    const newState = { ...state, members: [...state.members, member] };
-    persist(newState);
-  }, [state, persist]);
+  const addUser = useCallback((user: User) => {
+    persist({ ...state, users: [...state.users, user] });
+  }, [state]);
 
-  const updateMember = useCallback((id: string, updates: Partial<Member>) => {
-    const newState = {
-      ...state,
-      members: state.members.map((m) => (m.id === id ? { ...m, ...updates } : m)),
-    };
-    persist(newState);
-  }, [state, persist]);
-
-  const deleteMember = useCallback((id: string) => {
-    const newState = { ...state, members: state.members.filter((m) => m.id !== id) };
-    persist(newState);
-  }, [state, persist]);
-
-  const updateLaneStatus = useCallback((id: string, status: Lane['status']) => {
-    const newState = {
-      ...state,
-      lanes: state.lanes.map((l) => (l.id === id ? { ...l, status } : l)),
-    };
-    persist(newState);
-  }, [state, persist]);
+  const updateLane = useCallback((lane: Lane) => {
+    persist({ ...state, lanes: state.lanes.map((l) => l.id === lane.id ? lane : l) });
+  }, [state]);
 
   const addBooking = useCallback((booking: Booking) => {
-    const newState = {
-      ...state,
-      bookings: [...state.bookings, booking],
-      slots: state.slots.map((s) => (s.id === booking.slotId ? { ...s, status: 'booked' as const } : s)),
-    };
-    persist(newState);
-  }, [state, persist]);
+    persist({ ...state, bookings: [...state.bookings, booking] });
+  }, [state]);
 
-  const updateBookingStatus = useCallback((id: string, status: Booking['status']) => {
-    const booking = state.bookings.find((b) => b.id === id);
-    let newSlots = state.slots;
-    if (booking && status === 'cancelled') {
-      newSlots = state.slots.map((s) => (s.id === booking.slotId ? { ...s, status: 'available' as const } : s));
-    }
-    const newState = {
+  const cancelBooking = useCallback((id: string) => {
+    persist({
       ...state,
-      bookings: state.bookings.map((b) => (b.id === id ? { ...b, status } : b)),
-      slots: newSlots,
-    };
-    persist(newState);
-  }, [state, persist]);
+      bookings: state.bookings.map((b) => b.id === id ? { ...b, status: 'cancelled' as const } : b),
+    });
+  }, [state]);
 
-  const addTournament = useCallback((tournament: Tournament) => {
-    const newState = { ...state, tournaments: [...state.tournaments, tournament] };
-    persist(newState);
-  }, [state, persist]);
+  const addSubscription = useCallback((sub: Subscription) => {
+    persist({ ...state, subscriptions: [...state.subscriptions, sub] });
+  }, [state]);
 
-  const joinTournament = useCallback((tournamentId: string) => {
-    if (!state.currentUser) return;
-    const newState = {
+  const updateSubscription = useCallback((id: string, updates: Partial<Subscription>) => {
+    persist({
       ...state,
-      tournaments: state.tournaments.map((t) => {
-        if (t.id === tournamentId && !t.participants.includes(state.currentUser!.id)) {
-          return { ...t, participants: [...t.participants, state.currentUser!.id] };
-        }
-        return t;
-      }),
-    };
-    persist(newState);
-  }, [state, persist]);
+      subscriptions: state.subscriptions.map((s) => s.id === id ? { ...s, ...updates } : s),
+    });
+  }, [state]);
+
+  const joinTournament = useCallback((tournamentId: string, userId: string) => {
+    persist({
+      ...state,
+      tournaments: state.tournaments.map((t) =>
+        t.id === tournamentId && !t.participants.includes(userId) && t.participants.length < t.maxParticipants
+          ? { ...t, participants: [...t.participants, userId] }
+          : t
+      ),
+    });
+  }, [state]);
+
+  const leaveTournament = useCallback((tournamentId: string, userId: string) => {
+    persist({
+      ...state,
+      tournaments: state.tournaments.map((t) =>
+        t.id === tournamentId
+          ? { ...t, participants: t.participants.filter((p) => p !== userId) }
+          : t
+      ),
+    });
+  }, [state]);
 
   const markNotificationRead = useCallback((id: string) => {
-    const newState = {
+    persist({
       ...state,
-      notifications: state.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    };
-    persist(newState);
-  }, [state, persist]);
+      notifications: state.notifications.map((n) => n.id === id ? { ...n, read: true } : n),
+    });
+  }, [state]);
 
-  const markAllNotificationsRead = useCallback(() => {
-    if (!state.currentUser) return;
-    const newState = {
-      ...state,
-      notifications: state.notifications.map((n) =>
-        n.userId === state.currentUser!.id ? { ...n, read: true } : n
-      ),
-    };
-    persist(newState);
-  }, [state, persist]);
+  const addNotification = useCallback((notification: Notification) => {
+    persist({ ...state, notifications: [...state.notifications, notification] });
+  }, [state]);
 
   return {
-    ...state,
     state,
     login,
     logout,
-    addMember,
-    updateMember,
-    deleteMember,
-    updateLaneStatus,
+    addUser,
+    updateLane,
     addBooking,
-    updateBookingStatus,
-    addTournament,
+    cancelBooking,
+    addSubscription,
+    updateSubscription,
     joinTournament,
+    leaveTournament,
     markNotificationRead,
-    markAllNotificationsRead,
+    addNotification,
   };
 }
