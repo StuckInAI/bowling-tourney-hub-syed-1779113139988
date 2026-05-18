@@ -1,266 +1,140 @@
-import { useState, useEffect, useCallback } from 'react';
-import type { AppState, User, Subscription, Lane, TimeSlot, Booking, Tournament, TournamentInvite, TournamentScore, Notification } from '@/types';
+import { useState, useCallback } from 'react';
 import { loadState, saveState } from '@/lib/storage';
-import {
-  createSeedUsers,
-  createSeedSubscriptions,
-  createSeedLanes,
-  createSeedTimeSlots,
-  createSeedBookings,
-  createSeedTournaments,
-  createSeedInvites,
-  createSeedScores,
-  createSeedNotifications,
-} from '@/lib/seedData';
+import { seedData } from '@/lib/seedData';
+import type { AppState, Member, Lane, Booking, Tournament, Notification, AppContextType } from '@/types';
 
-function getInitialState(): AppState {
-  const saved = loadState();
-  if (saved) return saved;
+const initialState: AppState = loadState() || seedData();
 
-  const lanes = createSeedLanes();
-  const timeSlots = createSeedTimeSlots(lanes);
-  const bookings = createSeedBookings();
+export function useAppState(): AppContextType {
+  const [state, setState] = useState<AppState>(initialState);
 
-  // Link bookings to slots
-  for (const booking of bookings) {
-    const matchSlot = timeSlots.find(
-      (s) => s.laneId === booking.laneId && s.date === booking.date && s.startHour === booking.startHour
-    );
-    if (matchSlot) {
-      booking.slotId = matchSlot.id;
-      matchSlot.bookingId = booking.id;
-      matchSlot.status = booking.type === 'member' ? 'booked_member' : 'booked_outsider';
-    }
-  }
+  const persist = useCallback((newState: AppState) => {
+    setState(newState);
+    saveState(newState);
+  }, []);
 
-  // Reserve tournament slots
-  const tournaments = createSeedTournaments();
-  for (const t of tournaments) {
-    for (const laneId of t.laneIds) {
-      for (let h = t.startHour; h < t.endHour; h++) {
-        const slot = timeSlots.find((s) => s.laneId === laneId && s.date === t.date && s.startHour === h);
-        if (slot && slot.status === 'available') {
-          slot.status = 'reserved_tournament';
-          slot.tournamentId = t.id;
-        }
-      }
-    }
-  }
-
-  return {
-    currentUser: null,
-    users: createSeedUsers(),
-    subscriptions: createSeedSubscriptions(),
-    lanes,
-    timeSlots,
-    bookings,
-    tournaments,
-    tournamentInvites: createSeedInvites(),
-    tournamentScores: createSeedScores(),
-    notifications: createSeedNotifications(),
-  };
-}
-
-export function useAppState() {
-  const [state, setState] = useState<AppState>(getInitialState);
-
-  useEffect(() => {
-    saveState(state);
-  }, [state]);
-
-  const login = useCallback((email: string, password: string): User | null => {
-    const user = state.users.find((u) => u.email === email && u.password === password);
+  const login = useCallback((email: string): boolean => {
+    const users = [
+      { id: 'u1', name: 'Admin User', email: 'admin@bowlbook.com', role: 'super_admin' as const },
+      { id: 'u2', name: 'Manager Smith', email: 'manager@bowlbook.com', role: 'venue_manager' as const },
+      { id: 'u3', name: 'Staff Jones', email: 'staff@bowlbook.com', role: 'staff' as const },
+      { id: 'u4', name: 'John Member', email: 'member@bowlbook.com', role: 'member' as const },
+    ];
+    const user = users.find((u) => u.email === email);
     if (user) {
-      setState((prev) => ({ ...prev, currentUser: user }));
-      return user;
+      const newState = { ...state, currentUser: user };
+      persist(newState);
+      return true;
     }
-    return null;
-  }, [state.users]);
+    return false;
+  }, [state, persist]);
 
   const logout = useCallback(() => {
-    setState((prev) => ({ ...prev, currentUser: null }));
-  }, []);
+    const newState = { ...state, currentUser: null };
+    persist(newState);
+  }, [state, persist]);
 
-  const updateState = useCallback((updater: (prev: AppState) => AppState) => {
-    setState(updater);
-  }, []);
+  const addMember = useCallback((member: Member) => {
+    const newState = { ...state, members: [...state.members, member] };
+    persist(newState);
+  }, [state, persist]);
 
-  const addUser = useCallback((user: User) => {
-    setState((prev) => ({ ...prev, users: [...prev.users, user] }));
-  }, []);
+  const updateMember = useCallback((id: string, updates: Partial<Member>) => {
+    const newState = {
+      ...state,
+      members: state.members.map((m) => (m.id === id ? { ...m, ...updates } : m)),
+    };
+    persist(newState);
+  }, [state, persist]);
 
-  const updateUser = useCallback((userId: string, updates: Partial<User>) => {
-    setState((prev) => ({
-      ...prev,
-      users: prev.users.map((u) => (u.id === userId ? { ...u, ...updates } : u)),
-    }));
-  }, []);
+  const deleteMember = useCallback((id: string) => {
+    const newState = { ...state, members: state.members.filter((m) => m.id !== id) };
+    persist(newState);
+  }, [state, persist]);
 
-  const addSubscription = useCallback((sub: Subscription) => {
-    setState((prev) => ({ ...prev, subscriptions: [...prev.subscriptions, sub] }));
-  }, []);
-
-  const updateSubscription = useCallback((subId: string, updates: Partial<Subscription>) => {
-    setState((prev) => ({
-      ...prev,
-      subscriptions: prev.subscriptions.map((s) => (s.id === subId ? { ...s, ...updates } : s)),
-    }));
-  }, []);
-
-  const updateLane = useCallback((laneId: string, updates: Partial<Lane>) => {
-    setState((prev) => ({
-      ...prev,
-      lanes: prev.lanes.map((l) => (l.id === laneId ? { ...l, ...updates } : l)),
-    }));
-  }, []);
+  const updateLaneStatus = useCallback((id: string, status: Lane['status']) => {
+    const newState = {
+      ...state,
+      lanes: state.lanes.map((l) => (l.id === id ? { ...l, status } : l)),
+    };
+    persist(newState);
+  }, [state, persist]);
 
   const addBooking = useCallback((booking: Booking) => {
-    setState((prev) => {
-      const newSlots = prev.timeSlots.map((s) => {
-        if (s.id === booking.slotId) {
-          return { ...s, bookingId: booking.id, status: (booking.type === 'member' ? 'booked_member' : 'booked_outsider') as TimeSlot['status'] };
-        }
-        return s;
-      });
-      return { ...prev, bookings: [...prev.bookings, booking], timeSlots: newSlots };
-    });
-  }, []);
+    const newState = {
+      ...state,
+      bookings: [...state.bookings, booking],
+      slots: state.slots.map((s) => (s.id === booking.slotId ? { ...s, status: 'booked' as const } : s)),
+    };
+    persist(newState);
+  }, [state, persist]);
 
-  const cancelBooking = useCallback((bookingId: string) => {
-    setState((prev) => {
-      const booking = prev.bookings.find((b) => b.id === bookingId);
-      if (!booking) return prev;
-      const newBookings = prev.bookings.map((b) => (b.id === bookingId ? { ...b, status: 'cancelled' as Booking['status'] } : b));
-      const newSlots = prev.timeSlots.map((s) => {
-        if (s.bookingId === bookingId) {
-          return { ...s, bookingId: null, status: 'available' as TimeSlot['status'] };
-        }
-        return s;
-      });
-      return { ...prev, bookings: newBookings, timeSlots: newSlots };
-    });
-  }, []);
+  const updateBookingStatus = useCallback((id: string, status: Booking['status']) => {
+    const booking = state.bookings.find((b) => b.id === id);
+    let newSlots = state.slots;
+    if (booking && status === 'cancelled') {
+      newSlots = state.slots.map((s) => (s.id === booking.slotId ? { ...s, status: 'available' as const } : s));
+    }
+    const newState = {
+      ...state,
+      bookings: state.bookings.map((b) => (b.id === id ? { ...b, status } : b)),
+      slots: newSlots,
+    };
+    persist(newState);
+  }, [state, persist]);
 
   const addTournament = useCallback((tournament: Tournament) => {
-    setState((prev) => {
-      const newSlots = prev.timeSlots.map((s) => {
-        if (
-          tournament.laneIds.includes(s.laneId) &&
-          s.date === tournament.date &&
-          s.startHour >= tournament.startHour &&
-          s.startHour < tournament.endHour &&
-          s.status === 'available'
-        ) {
-          return { ...s, status: 'reserved_tournament' as TimeSlot['status'], tournamentId: tournament.id };
+    const newState = { ...state, tournaments: [...state.tournaments, tournament] };
+    persist(newState);
+  }, [state, persist]);
+
+  const joinTournament = useCallback((tournamentId: string) => {
+    if (!state.currentUser) return;
+    const newState = {
+      ...state,
+      tournaments: state.tournaments.map((t) => {
+        if (t.id === tournamentId && !t.participants.includes(state.currentUser!.id)) {
+          return { ...t, participants: [...t.participants, state.currentUser!.id] };
         }
-        return s;
-      });
-      return { ...prev, tournaments: [...prev.tournaments, tournament], timeSlots: newSlots };
-    });
-  }, []);
+        return t;
+      }),
+    };
+    persist(newState);
+  }, [state, persist]);
 
-  const updateTournament = useCallback((tournamentId: string, updates: Partial<Tournament>) => {
-    setState((prev) => ({
-      ...prev,
-      tournaments: prev.tournaments.map((t) => (t.id === tournamentId ? { ...t, ...updates } : t)),
-    }));
-  }, []);
+  const markNotificationRead = useCallback((id: string) => {
+    const newState = {
+      ...state,
+      notifications: state.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
+    };
+    persist(newState);
+  }, [state, persist]);
 
-  const addTournamentInvites = useCallback((invites: TournamentInvite[]) => {
-    setState((prev) => ({ ...prev, tournamentInvites: [...prev.tournamentInvites, ...invites] }));
-  }, []);
-
-  const respondToInvite = useCallback((inviteId: string, response: 'accepted' | 'declined') => {
-    setState((prev) => ({
-      ...prev,
-      tournamentInvites: prev.tournamentInvites.map((inv) =>
-        inv.id === inviteId ? { ...inv, status: response, respondedAt: new Date().toISOString() } : inv
+  const markAllNotificationsRead = useCallback(() => {
+    if (!state.currentUser) return;
+    const newState = {
+      ...state,
+      notifications: state.notifications.map((n) =>
+        n.userId === state.currentUser!.id ? { ...n, read: true } : n
       ),
-    }));
-  }, []);
-
-  const addScore = useCallback((score: TournamentScore) => {
-    setState((prev) => ({ ...prev, tournamentScores: [...prev.tournamentScores, score] }));
-  }, []);
-
-  const addNotification = useCallback((notification: Notification) => {
-    setState((prev) => ({ ...prev, notifications: [...prev.notifications, notification] }));
-  }, []);
-
-  const markNotificationRead = useCallback((notifId: string) => {
-    setState((prev) => ({
-      ...prev,
-      notifications: prev.notifications.map((n) => (n.id === notifId ? { ...n, read: true } : n)),
-    }));
-  }, []);
-
-  const markAllNotificationsRead = useCallback((userId: string) => {
-    setState((prev) => ({
-      ...prev,
-      notifications: prev.notifications.map((n) => (n.userId === userId ? { ...n, read: true } : n)),
-    }));
-  }, []);
-
-  const resetState = useCallback(() => {
-    const lanes = createSeedLanes();
-    const timeSlots = createSeedTimeSlots(lanes);
-    const bookings = createSeedBookings();
-    for (const booking of bookings) {
-      const matchSlot = timeSlots.find(
-        (s) => s.laneId === booking.laneId && s.date === booking.date && s.startHour === booking.startHour
-      );
-      if (matchSlot) {
-        booking.slotId = matchSlot.id;
-        matchSlot.bookingId = booking.id;
-        matchSlot.status = booking.type === 'member' ? 'booked_member' : 'booked_outsider';
-      }
-    }
-    const tournaments = createSeedTournaments();
-    for (const t of tournaments) {
-      for (const laneId of t.laneIds) {
-        for (let h = t.startHour; h < t.endHour; h++) {
-          const slot = timeSlots.find((s) => s.laneId === laneId && s.date === t.date && s.startHour === h);
-          if (slot && slot.status === 'available') {
-            slot.status = 'reserved_tournament';
-            slot.tournamentId = t.id;
-          }
-        }
-      }
-    }
-    setState({
-      currentUser: null,
-      users: createSeedUsers(),
-      subscriptions: createSeedSubscriptions(),
-      lanes,
-      timeSlots,
-      bookings,
-      tournaments,
-      tournamentInvites: createSeedInvites(),
-      tournamentScores: createSeedScores(),
-      notifications: createSeedNotifications(),
-    });
-  }, []);
+    };
+    persist(newState);
+  }, [state, persist]);
 
   return {
+    ...state,
     state,
     login,
     logout,
-    updateState,
-    addUser,
-    updateUser,
-    addSubscription,
-    updateSubscription,
-    updateLane,
+    addMember,
+    updateMember,
+    deleteMember,
+    updateLaneStatus,
     addBooking,
-    cancelBooking,
+    updateBookingStatus,
     addTournament,
-    updateTournament,
-    addTournamentInvites,
-    respondToInvite,
-    addScore,
-    addNotification,
+    joinTournament,
     markNotificationRead,
     markAllNotificationsRead,
-    resetState,
   };
 }

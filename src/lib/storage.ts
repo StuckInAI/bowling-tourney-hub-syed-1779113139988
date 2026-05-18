@@ -1,26 +1,23 @@
 import type { AppState } from '@/types';
 
-const STORAGE_KEY = 'bowling_app_state';
+const STORAGE_KEY = 'bowlbook_state';
 
 export function loadState(): AppState | null {
   try {
-    const serialized = localStorage.getItem(STORAGE_KEY);
-    if (!serialized) return null;
-    return JSON.parse(serialized) as AppState;
-  } catch {
-    return null;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      return JSON.parse(raw) as AppState;
+    }
+  } catch (e) {
+    console.error('Failed to load state from localStorage', e);
   }
+  return null;
 }
 
 export function saveState(state: AppState): void {
   try {
-    const serialized = JSON.stringify(state);
-    localStorage.setItem(STORAGE_KEY, serialized);
-  } catch {
-    // ignore
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.error('Failed to save state to localStorage', e);
   }
-}
-
-export function clearState(): void {
-  localStorage.removeItem(STORAGE_KEY);
 }
