@@ -1,0 +1,39 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.default {
+  background: var(--color-bg);
+  color: var(--color-text-light);
+}
+
+.success {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.warning {
+  background: #fef3c7;
+  color: #a16207;
+}
+
+.danger {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.info {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.purple {
+  background: #f3e8ff;
+  color: #7c3aed;
+}

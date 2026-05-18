@@ -1,0 +1,130 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.pageTitle {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.dateSelector {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.dateBtn {
+  padding: 6px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  background: white;
+  color: var(--color-text-light);
+  transition: all 0.15s;
+}
+
+.dateBtn:hover {
+  border-color: var(--color-primary-light);
+}
+
+.dateActive {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+
+.legend {
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.legendItem {
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.gridWrap {
+  overflow-x: auto;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 80px repeat(13, 1fr);
+  gap: 2px;
+  min-width: 800px;
+}
+
+.cornerCell {
+  padding: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.headerCell {
+  padding: 6px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+}
+
+.row {
+  display: contents;
+}
+
+.laneCell {
+  padding: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+}
+
+.slotCell {
+  height: 32px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.slotCell:hover {
+  opacity: 0.8;
+}
+
+.available {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.bookedMember {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.bookedOutsider {
+  background: #f3e8ff;
+  color: #7c3aed;
+}
+
+.reservedTournament {
+  background: #fef3c7;
+  color: #a16207;
+}
+
+.publiclyAvailable {
+  background: #e0f2fe;
+  color: #0369a1;
+}
